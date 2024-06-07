@@ -1,0 +1,74 @@
+### LAMMPS input file for Polymer melt ###############
+#### Version : Apr-04-2019 ########################################
+#Stage1: Minimization and equilibration
+#---------------Run a few steps to completely equilibrate system--#
+
+units           lj
+boundary        p p p
+atom_style      bond
+read_data       run_equil3.data
+bond_style      fene
+bond_coeff      1 30 1.5 1.0 1.0
+bond_coeff      2 30 1.5 1.0 1.0
+pair_style lj/cut 1.12246
+pair_modify shift yes
+pair_coeff * * 1 1
+
+#-------------------Data read and Pair initialize-------------------#
+
+special_bonds   fene
+
+#--------------------Variable Definitions---------------------------#
+
+variable ts equal step
+variable tconst equal 200*dt
+
+## Radius of Gyration
+compute 	cc1 all chunk/atom molecule
+compute gyr all gyration/chunk cc1 
+variable Rgave equal ave(c_gyr)
+
+#--------------------Initialize-------------------------------------#
+
+thermo_style    custom step time temp press pe ke etotal epair density v_Rgave
+thermo          2000
+neighbor        0.4 bin
+neigh_modify    every 1 delay 0 check yes
+
+
+#--------------------InitialEquil--------------------------------#
+
+timestep 0.005
+fix 1 all nve
+fix 2 all langevin 1.0 1.0 0.5 48279
+dump 2 all custom 400000 dump.lammps* id type x y z xu yu zu 
+run 400000
+
+#-----------Main Run2 - Long Equilibrium
+pair_style lj/cut 1.12246
+pair_modify shift yes 
+pair_coeff 1 1 1.0 1.0 1.12246
+pair_coeff 1 2 1.0 1.0 1.12246
+pair_coeff 1 3 1.0 1.0 1.12246
+pair_coeff 2 2 1.42857 1.0 2.5
+pair_coeff 2 3 1.0 1.0 1.12246
+pair_coeff 3 3 1.0 1.0 1.12246
+
+restart 5000 restart1 restart2
+restart 1000000 archive_restart_eq.* 
+run 100000000
+write_restart run_equil4.*
+write_data run_equil4.data
+run 50000000
+write_restart run_equil5.*
+write_data run_equil5.data
+run 50000000
+write_restart run_equil6.*
+write_data run_equil6.data
+#----------Write/unfix/delete -------------------------------------#
+
+unfix 1
+unfix 2
+undump 2
+variable tconst delete
+variable ts delete
